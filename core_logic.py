@@ -9,6 +9,7 @@ import re
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,28 +46,31 @@ def get_text_chunks(text: str) -> List[str]:
     logger.info(f"Created {len(chunks)} chunks.")
     return chunks
 
-def get_vector_store(text_chunks: List[str]):
-    """Creates a FAISS vector store from text chunks using HuggingFace embeddings."""
-    logger.info("Creating vector store... (This may take a moment on first run)")
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
-    logger.info("Vector store created successfully.")
-    return vectorstore
-
 # --- Main System Class ---
 
 class HackRxSystem:
     def __init__(self):
-        self.api_keys = [
-            "AIzaSyD7VOzLJe9tdHBPfz2MaF0ag1uKLMN5S4I", "AIzaSyAzioJtpKSSU8RqzeDielck08m7YOkL6Lk",
-            "AIzaSyCturqn478GurAsDjG80p38xwOJR8i5Dxc", "AIzaSyAKxMS3h-Dvg4R-eEa1VTZagfgYdsyGJ08",
-            "AIzaSyCi-kSXDkJtjn3qpHOtn7_i2Gp44eM9tzc", "AIzaSyAp61P_hc25OuJW0CG2YBhFvj8ndAGPSGA",
-            "AIzaSyDjPfezH_amGWt9G5vpr-2x5mYZN1AdYpU", "AIzaSyDooA_ozoxWw-fDeM8-HPu0wc6hKW_82fg",
-            "AIzaSyCUtj4SePS6u_w5NDNBeSrgS7E5XgQbNN0", "AIzaSyCZJIdCw2Olw7iu6yFOaav0COa_btX99N8"
-        ]
+        """Initializes the system, API keys, and pre-loads all necessary models."""
+        self.api_keys = os.getenv("GEMINI_API_KEYS", "").split(',')
+        if not self.api_keys or self.api_keys == ['']:
+            raise ValueError("GEMINI_API_KEYS environment variable not set or empty.")
+        
         self.current_api_key_index = 0
         self.model = None
+        self.embeddings = None
         self._initialize_model()
+        self._initialize_embeddings()
+
+    def _initialize_embeddings(self):
+        """Loads the sentence-transformer model into memory."""
+        try:
+            logger.info("Loading sentence-transformer model... (This happens once)")
+            self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            logger.info("Sentence-transformer model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load embeddings model: {e}", exc_info=True)
+            # This is a fatal error, so we raise it.
+            raise e
 
     def _initialize_model(self):
         """Initializes the Gemini model with the current API key."""
@@ -148,12 +152,17 @@ class HackRxSystem:
             pdf_bytes = download_pdf(pdf_url)
             document_text = extract_text_from_pdf(pdf_bytes)
             text_chunks = get_text_chunks(document_text)
-            vector_store = get_vector_store(text_chunks)
             
-            del document_text, text_chunks, pdf_bytes
+            del document_text
             gc.collect()
 
+            logger.info("Creating vector store...")
+            if not self.embeddings:
+                raise Exception("Embeddings model not initialized.")
+
+            vector_store = FAISS.from_texts(text_chunks, self.embeddings)
             retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+            logger.info("Vector store created successfully.")
 
             all_answers = []
             batch_size = 10
