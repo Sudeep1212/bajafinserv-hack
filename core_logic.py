@@ -51,9 +51,13 @@ def get_text_chunks(text: str) -> List[str]:
 class HackRxSystem:
     def __init__(self):
         """Initializes the system, API keys, and pre-loads all necessary models."""
-        self.api_keys = os.getenv("GEMINI_API_KEYS", "").split(',')
-        if not self.api_keys or self.api_keys == ['']:
-            raise ValueError("GEMINI_API_KEYS environment variable not set or empty.")
+        self.api_keys = [
+            "AIzaSyD7VOzLJe9tdHBPfz2MaF0ag1uKLMN5S4I", "AIzaSyAzioJtpKSSU8RqzeDielck08m7YOkL6Lk",
+            "AIzaSyCturqn478GurAsDjG80p38xwOJR8i5Dxc", "AIzaSyAKxMS3h-Dvg4R-eEa1VTZagfgYdsyGJ08",
+            "AIzaSyCi-kSXDkJtjn3qpHOtn7_i2Gp44eM9tzc", "AIzaSyAp61P_hc25OuJW0CG2YBhFvj8ndAGPSGA",
+            "AIzaSyDjPfezH_amGWt9G5vpr-2x5mYZN1AdYpU", "AIzaSyDooA_ozoxWw-fDeM8-HPu0wc6hKW_82fg",
+            "AIzaSyCUtj4SePS6u_w5NDNBeSrgS7E5XgQbNN0", "AIzaSyCZJIdCw2Olw7iu6yFOaav0COa_btX99N8"
+        ]
         
         self.current_api_key_index = 0
         self.model = None
