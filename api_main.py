@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import List
@@ -6,23 +5,48 @@ import logging
 import time
 import sys
 import os
-import sys
+from contextlib import asynccontextmanager
 
 # This line ensures that the current directory is in the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import the new system from core_logic
-from core_logic import hackrx_system
+from core_logic import HackRxSystem
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# --- Global Variables ---
+# This will hold our initialized system with its models loaded.
+# We use a dictionary to make it mutable across the app's life.
+app_state = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    This function runs on application startup and shutdown.
+    It's the perfect place to load heavy models so it only happens once.
+    """
+    logging.info("=== Application Startup ===")
+    logging.info("Loading models and initializing system... This may take a moment.")
+    
+    # Initialize the core system, which will load the Gemini model
+    # and, more importantly, the sentence-transformer model for the retriever.
+    app_state["hackrx_system"] = HackRxSystem()
+    
+    logging.info("System initialized successfully.")
+    yield
+    # --- Cleanup on shutdown (optional) ---
+    logging.info("=== Application Shutdown ===")
+    app_state.clear()
+
+# Create FastAPI app with the lifespan event handler
 app = FastAPI(
     title="HackRx 6.0 - A6 Memory-Optimized RAG System",
     description="A memory-efficient system using BM25 and Gemini for document Q&A.",
-    version="6.0.0"
+    version="6.0.0",
+    lifespan=lifespan
 )
 
 # Pydantic models for request/response
@@ -66,6 +90,9 @@ async def run_hackrx_system_endpoint(
     start_time = time.time()
     logger.info("=== Received new request for /hackrx/run ===")
     
+    if "hackrx_system" not in app_state:
+        raise HTTPException(status_code=503, detail="System not initialized. Please wait and try again.")
+
     try:
         if not request.documents:
             raise HTTPException(status_code=400, detail="Document URL is required")
@@ -74,8 +101,11 @@ async def run_hackrx_system_endpoint(
         
         logger.info(f"Processing {len(request.questions)} questions from document: {request.documents}")
         
+        # Get the pre-loaded system
+        system: HackRxSystem = app_state["hackrx_system"]
+        
         # Process questions using the new system
-        result = hackrx_system.process_questions(request.documents, request.questions)
+        result = system.process_questions(request.documents, request.questions)
         
         total_time = time.time() - start_time
         logger.info(f"=== Completed request in {total_time:.2f}s ===")
