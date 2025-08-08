@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+PyMuPDF
+langchain
+google-generativeai
+sentence-transformers
+faiss-cpu
