@@ -6,4 +6,8 @@ langchain
 google-generativeai
 sentence-transformers
 faiss-cpu
+<<<<<<< HEAD
 langchain-community
+=======
+langchain-community
+>>>>>>> 09cb83d587969d0b45acb647af7ace49ecdb0516
